@@ -312,7 +312,7 @@ function PhotoModal({
 }
 
 // ---------------------------------------------------------------------------
-// Add Equipment Modal (FORMULIR TERPISAH)
+// Add Equipment Modal
 // ---------------------------------------------------------------------------
 function AddEquipmentModal({
   onClose,
@@ -473,7 +473,7 @@ function AddEquipmentModal({
 }
 
 // ---------------------------------------------------------------------------
-// Service modal — VERIFIKASI 2 TAHAP
+// Service modal — VERIFIKASI 2 TAHAP (FOTO SEKARANG OPSIONAL)
 // ---------------------------------------------------------------------------
 function ServiceModal({
   equipment,
@@ -495,7 +495,13 @@ function ServiceModal({
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0] || null;
-    if (!f) return;
+    if (!f) {
+      setFile(null);
+      setPreview(null);
+      setError(null);
+      return;
+    }
+    // Validasi hanya kalau ada file
     if (f.size > 5 * 1024 * 1024) { setError("Ukuran file maksimal 5MB"); return; }
     if (!f.type.startsWith("image/")) { setError("File harus berupa gambar"); return; }
     setFile(f);
@@ -504,7 +510,7 @@ function ServiceModal({
   };
 
   const goToStep2 = () => {
-    if (!file) { setError("Wajib upload foto bukti service"); return; }
+    // 👇 FOTO TIDAK WAJIB LAGI — hanya validasi tanggal
     if (!servicedAt) { setError("Tanggal service harus diisi"); return; }
     setError(null);
     setStep(2);
@@ -520,6 +526,7 @@ function ServiceModal({
     try {
       let photoUrl: string | null = null;
 
+      // 👇 Upload foto HANYA kalau ada file
       if (file) {
         const path = `${equipment.id}/${Date.now()}-${file.name}`;
         const { error: uploadError } = await supabase.storage.from("service-photos").upload(path, file);
@@ -569,12 +576,13 @@ function ServiceModal({
             </div>
 
             <div>
+              {/* 👇 LABEL DIUBAH: dari "*" jadi "(opsional)" */}
               <label className="block text-xs font-medium uppercase tracking-wide mb-1.5" style={{ color: "#6B7570" }}>
-                Foto Bukti Service *
+                Foto Bukti Service <span style={{ color: "#8A9590" }}>(opsional)</span>
               </label>
               <input type="file" accept="image/*" onChange={handleFileChange} className="w-full text-sm" style={{ color: "#1B2420" }} />
               <p className="text-[10px] mt-1" style={{ color: "#8A9590" }}>
-                Maksimal 5MB (JPG/PNG). Foto harus jelas memperlihatkan peralatan.
+                Maksimal 5MB (JPG/PNG). Upload kalau ada dokumentasi.
               </p>
               {preview && (
                 <img
@@ -588,7 +596,7 @@ function ServiceModal({
 
             <div>
               <label className="block text-xs font-medium uppercase tracking-wide mb-1.5" style={{ color: "#6B7570" }}>
-                Catatan Teknisi (opsional)
+                Catatan Teknisi <span style={{ color: "#8A9590" }}>(opsional)</span>
               </label>
               <textarea
                 rows={2}
@@ -637,8 +645,9 @@ function ServiceModal({
                 <li>• <strong>Peralatan:</strong> {equipment.name} ({equipment.type})</li>
                 <li>• <strong>Lokasi:</strong> {equipment.location || "-"}</li>
                 <li>• <strong>Tanggal Service:</strong> {new Date(servicedAt).toLocaleDateString("id-ID", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</li>
-                <li>• <strong>Foto:</strong> {file?.name}</li>
+                <li>• <strong>Foto:</strong> {file ? file.name : <em style={{ color: "#8A9590" }}>tidak diupload</em>}</li>
                 {notes && <li>• <strong>Catatan:</strong> {notes}</li>}
+                {!notes && <li>• <strong>Catatan:</strong> <em style={{ color: "#8A9590" }}>kosong</em></li>}
               </ul>
             </div>
 
@@ -846,7 +855,7 @@ function EditModal({
 }
 
 // ---------------------------------------------------------------------------
-// Dashboard (FOKUS MONITORING)
+// Dashboard
 // ---------------------------------------------------------------------------
 export default function Dashboard() {
   const [equipmentList, setEquipmentList] = useState<any[]>([]);
@@ -856,7 +865,7 @@ export default function Dashboard() {
   const [serviceTarget, setServiceTarget] = useState<any | null>(null);
   const [editTarget, setEditTarget] = useState<any | null>(null);
   const [photoTarget, setPhotoTarget] = useState<{ url: string; name: string } | null>(null);
-  const [showAddForm, setShowAddForm] = useState(false); // 👈 modal form
+  const [showAddForm, setShowAddForm] = useState(false);
 
   const [viewMode, setViewMode] = useState<"card" | "table">(() => {
     if (typeof window === "undefined") return "card";
@@ -960,7 +969,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* COUNTER SEKALIGUS FILTER */}
           <div className="flex gap-3 flex-wrap">
             <button
               onClick={() => toggleStatusFilter("belum")}
@@ -1021,7 +1029,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* LIST AREA — full width, tanpa form */}
         <div>
           <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
             <div className="flex items-center gap-2 flex-wrap">
@@ -1306,7 +1313,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* 👇 FLOATING ACTION BUTTON — buka modal form */}
       <button
         onClick={() => setShowAddForm(true)}
         className="fixed bottom-6 right-6 z-40 flex items-center gap-2 px-5 py-3 rounded-full shadow-lg text-white font-medium transition hover:shadow-xl hover:scale-105 active:scale-95"
@@ -1317,7 +1323,6 @@ export default function Dashboard() {
         <span className="hidden sm:inline text-sm">Tambah Peralatan</span>
       </button>
 
-      {/* 👇 MODAL FORM (muncul saat FAB diklik) */}
       {showAddForm && (
         <AddEquipmentModal
           onClose={() => setShowAddForm(false)}
