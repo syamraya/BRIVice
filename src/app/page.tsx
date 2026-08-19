@@ -1,5 +1,6 @@
 "use client";
-import { useState, useEffect } from "react";
+
+import { useState, useEffect, Suspense } from "react"; // 👈 tambah Suspense
 import { supabase } from "@/lib/supabase-client";
 import ExportButton from "@/components/ExportButton";
 import QRPrintModal from "@/components/QRPrintModal";
@@ -860,7 +861,7 @@ function EditModal({
 // ---------------------------------------------------------------------------
 // Dashboard
 // ---------------------------------------------------------------------------
-export default function Dashboard() {
+function DashboardInner() {
   const [equipmentList, setEquipmentList] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -1419,5 +1420,17 @@ useEffect(() => {
   />
 )}
     </main>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen flex items-center justify-center" style={{ background: "#EEF1EE" }}>
+        <p className="font-body" style={{ color: "#6B7570" }}>Memuat dashboard...</p>
+      </main>
+    }>
+      <DashboardInner />
+    </Suspense>
   );
 }
