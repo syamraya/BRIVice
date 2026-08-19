@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from "react"; // 👈 tambah Suspense
 import { supabase } from "@/lib/supabase-client";
 import ExportButton from "@/components/ExportButton";
+import ConfirmModal from "@/components/ConfirmModal";
 import QRPrintModal from "@/components/QRPrintModal";
 import { useSearchParams } from "next/navigation";
 
@@ -871,6 +872,8 @@ function DashboardInner() {
   const [photoTarget, setPhotoTarget] = useState<{ url: string; name: string } | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [qrTarget, setQrTarget] = useState<any | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [showLogout, setShowLogout] = useState(false);
   const searchParams = useSearchParams();
 
   const [viewMode, setViewMode] = useState<"card" | "table">(() => {
@@ -916,16 +919,16 @@ useEffect(() => {
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Hapus ${name}?`)) return;
-    setDeletingId(id);
-    const { error } = await supabase.from("equipment").delete().eq("id", id);
-    if (error) {
-      alert("Gagal menghapus: " + error.message);
-    } else {
-      setEquipmentList((prev) => prev.filter((i) => i.id !== id));
-    }
-    setDeletingId(null);
-  };
+  setDeletingId(id);
+  const { error } = await supabase.from("equipment").delete().eq("id", id);
+  if (error) {
+    alert("Gagal menghapus: " + error.message);
+  } else {
+    setEquipmentList((prev) => prev.filter((i) => i.id !== id));
+  }
+  setDeletingId(null);
+  setDeleteTarget(null);
+};
 
   const statusOf = (i: any) =>
     getServiceStatus(i.last_service_date, i.service_interval_days, i.service_verified === true);
@@ -1123,10 +1126,7 @@ useEffect(() => {
                 ↻ Refresh
               </button>
               <button
-  onClick={async () => {
-    await fetch("/api/logout", { method: "POST" });
-    window.location.href = "/login";
-  }}
+  onClick={() => setShowLogout(true)}
   className="text-xs font-mono uppercase tracking-wide hover:opacity-70 transition"
   style={{ color: "#C1443A" }}
 >
@@ -1241,7 +1241,7 @@ useEffect(() => {
   QR
 </button>
                             <button
-                              onClick={() => handleDelete(item.id, item.name)}
+                              onClick={() => setDeleteTarget(item)}
                               disabled={deletingId === item.id}
                               className="text-xs px-2 py-1 rounded transition hover:opacity-70 disabled:opacity-40"
                               style={{ color: "#C1443A" }}
@@ -1347,7 +1347,7 @@ useEffect(() => {
   QR
 </button>
                       <button
-                        onClick={() => handleDelete(item.id, item.name)}
+                        onClick={() => setDeleteTarget(item)}
                         disabled={deletingId === item.id}
                         className="text-xs px-3 rounded-md transition hover:opacity-70 disabled:opacity-40"
                         style={{ color: "#C1443A" }}
@@ -1417,6 +1417,32 @@ useEffect(() => {
   <QRPrintModal
     equipment={qrTarget}
     onClose={() => setQrTarget(null)}
+  />
+      )}
+      
+      {deleteTarget && (
+  <ConfirmModal
+    icon="🗑️"
+    title="Hapus Peralatan?"
+    message={`Yakin ingin menghapus "${deleteTarget.name}"? Alat ini akan hilang dari dashboard dan tidak akan mendapat reminder lagi.`}
+    confirmLabel="Ya, Hapus"
+    danger
+    onCancel={() => setDeleteTarget(null)}
+    onConfirm={() => handleDelete(deleteTarget.id, deleteTarget.name)}
+  />
+)}
+
+{showLogout && (
+  <ConfirmModal
+    icon="👋"
+    title="Yakin ingin keluar?"
+    message="Kamu harus memasukkan kode Authenticator atau PIN darurat lagi untuk masuk ke dashboard."
+    confirmLabel="Ya, Keluar"
+    onCancel={() => setShowLogout(false)}
+    onConfirm={async () => {
+      await fetch("/api/logout", { method: "POST" });
+      window.location.href = "/login";
+    }}
   />
 )}
     </main>
