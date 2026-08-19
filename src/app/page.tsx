@@ -1097,6 +1097,16 @@ export default function Dashboard() {
               >
                 ↻ Refresh
               </button>
+              <button
+  onClick={async () => {
+    await fetch("/api/logout", { method: "POST" });
+    window.location.href = "/login";
+  }}
+  className="text-xs font-mono uppercase tracking-wide hover:opacity-70 transition"
+  style={{ color: "#C1443A" }}
+>
+  ⎋ Keluar
+</button>
             </div>
           </div>
 
