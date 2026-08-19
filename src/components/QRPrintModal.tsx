@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 
 export default function QRPrintModal({
@@ -10,7 +10,6 @@ export default function QRPrintModal({
   onClose: () => void;
 }) {
   const [qr, setQr] = useState<string | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
   const qrUrl = `${baseUrl}/qr/${equipment.id}`;
@@ -54,22 +53,36 @@ export default function QRPrintModal({
         style={{ background: "rgba(27,36,32,0.45)" }}
         onClick={onClose}
       >
+        {/* 👇 TAMBAH color default biar semua teks kebaca */}
         <div
           className="bg-white rounded-xl w-full max-w-sm overflow-hidden"
+          style={{ color: "#1B2420" }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="px-5 py-4 border-b flex items-center justify-between" style={{ borderColor: "#D7DCD7", background: "#F7F8F6" }}>
+          <div
+            className="px-5 py-4 border-b flex items-center justify-between"
+            style={{ borderColor: "#D7DCD7", background: "#F7F8F6" }}
+          >
             <div>
               <p className="font-mono text-[10px] uppercase tracking-widest mb-0.5" style={{ color: "#8A9590" }}>
                 🏷️ Stiker QR
               </p>
-              <h2 className="font-display font-semibold text-base">{equipment.name}</h2>
+              <h2 className="font-display font-semibold text-base" style={{ color: "#1B2420" }}>
+                {equipment.name}
+              </h2>
             </div>
-            <button onClick={onClose} className="text-lg leading-none hover:opacity-60" style={{ color: "#6B7570" }}>×</button>
+            <button
+              onClick={onClose}
+              className="text-lg leading-none hover:opacity-60 transition"
+              style={{ color: "#6B7570" }}
+              aria-label="Tutup"
+            >
+              ×
+            </button>
           </div>
 
           <div className="p-5">
-            {/* Area yang di-print (hidden di layar, muncul saat print) */}
+            {/* Area yang di-print */}
             <div className="print-area" style={{ display: "none" }}>
               <div style={{
                 border: "2px dashed #1B2420",
@@ -106,17 +119,25 @@ export default function QRPrintModal({
 
             {/* Preview di layar */}
             <div className="flex justify-center mb-4">
-              <div className="border-2 border-dashed rounded-lg p-4" style={{ borderColor: "#D7DCD7", width: 260 }}>
+              <div
+                className="border-2 border-dashed rounded-lg p-4"
+                style={{ borderColor: "#D7DCD7", width: 260, background: "#fff" }}
+              >
                 <p className="font-mono text-[10px] uppercase tracking-widest text-center mb-1" style={{ color: "#6B7570" }}>
                   Scan untuk service
                 </p>
-                <p className="font-display font-bold text-center text-lg" style={{ color: "#2F5D62" }}>BRIVice</p>
+                <p className="font-display font-bold text-center text-lg" style={{ color: "#2F5D62" }}>
+                  BRIVice
+                </p>
                 {qr ? (
                   <img src={qr} alt="QR" className="w-full my-2" />
                 ) : (
                   <div className="w-full h-48 bg-gray-100 animate-pulse rounded" />
                 )}
-                <p className="text-center font-semibold text-sm">{equipment.name}</p>
+                {/* 👇 Nama alat sekarang kontras & kebaca */}
+                <p className="text-center font-semibold text-sm" style={{ color: "#1B2420" }}>
+                  {equipment.name}
+                </p>
                 <p className="text-center text-xs" style={{ color: "#6B7570" }}>
                   {equipment.type} · {equipment.location || "-"}
                 </p>
@@ -125,8 +146,6 @@ export default function QRPrintModal({
                 </p>
               </div>
             </div>
-
-            <canvas ref={canvasRef} style={{ display: "none" }} />
 
             <div className="flex gap-2">
               <button
@@ -139,7 +158,7 @@ export default function QRPrintModal({
               <button
                 onClick={handleDownload}
                 className="flex-1 text-sm font-medium py-2.5 rounded-md border transition hover:opacity-75"
-                style={{ borderColor: "#D7DCD7", color: "#2F5D62" }}
+                style={{ borderColor: "#D7DCD7", color: "#2F5D62", background: "#fff" }}
               >
                 📥 Download PNG
               </button>
