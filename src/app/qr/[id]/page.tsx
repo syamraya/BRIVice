@@ -37,9 +37,11 @@ export default function QRPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const handleService = () => {
-    router.push(`/login?next=/?service=${id}`);
-  };
+const handleService = () => {
+  // 👇 ENCODE supaya URL /?service=xxx tidak terpotong browser
+  const nextUrl = `/?service=${id}`;
+  router.push(`/login?next=${encodeURIComponent(nextUrl)}`);
+};
 
   if (loading) {
     return (

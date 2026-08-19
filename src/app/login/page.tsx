@@ -59,7 +59,12 @@ export default function LoginPage() {
         const d = await res.json();
         throw new Error(d.error || "Kode salah");
       }
-      router.push("/");
+    const currentUrl = new URL(window.location.href);
+const nextParam = currentUrl.searchParams.get("next");
+// Auto-decode kalau encoded, fallback ke "/" kalau tidak ada
+const nextUrl = nextParam ? decodeURIComponent(nextParam) : "/";
+router.push(nextUrl);
+router.refresh();
       router.refresh();
     } catch (err: any) {
       setError(err.message);
