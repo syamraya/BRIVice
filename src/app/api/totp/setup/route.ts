@@ -5,7 +5,6 @@ import QRCode from "qrcode";
 export async function POST(req: Request) {
   const { pin } = await req.json().catch(() => ({}));
 
-  // Harus pakai PIN admin untuk lihat QR
   if (!process.env.ACCESS_PIN || pin !== process.env.ACCESS_PIN) {
     return NextResponse.json({ error: "PIN admin salah." }, { status: 401 });
   }
@@ -31,6 +30,7 @@ export async function POST(req: Request) {
   const qr = await QRCode.toDataURL(url, {
     margin: 1,
     width: 280,
+    errorCorrectionLevel: "H", // 👈 tahan watermark, tetap scannable
     color: { dark: "#1B2420", light: "#FFFFFF" },
   });
 

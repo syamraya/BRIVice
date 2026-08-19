@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-const QR_TTL_SECONDS = 120; // QR & secret auto-hide setelah 2 menit
+const QR_TTL_SECONDS = 120;
 
 export default function SetupPage() {
   const router = useRouter();
@@ -15,38 +15,38 @@ export default function SetupPage() {
   const [verifying, setVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);
 
-  // 👇 Proteksi anti-screenshot
-  const [privacy, setPrivacy] = useState(false); // blur aktif
+  const [hidden, setHidden] = useState(false);
   const [ttl, setTtl] = useState(QR_TTL_SECONDS);
   const [notice, setNotice] = useState<string | null>(null);
+  const [revealedAt, setRevealedAt] = useState("");
 
-  // Blur saat window kehilangan fokus / tab disembunyikan / tombol PrintScreen / print
+  const visible = !!data && !hidden;
+
+  // Blur INSTAN saat window kehilangan fokus / pindah tab / PrintScreen / print
   useEffect(() => {
-    const onBlur = () => {
-      if (data) setPrivacy(true);
-    };
+    const onBlur = () => setHidden(true);
     const onVis = () => {
-      if (document.hidden && data) setPrivacy(true);
+      if (document.hidden) setHidden(true);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "PrintScreen" && data) {
-        setPrivacy(true);
-        setNotice("⌨️ Tombol screenshot terdeteksi — konten sensitif disembunyikan.");
+      if (e.key === "PrintScreen") {
+        setHidden(true);
+        setNotice("⌨️ Tombol screenshot terdeteksi — konten langsung di-blur.");
       }
     };
-    const onBeforePrint = () => setPrivacy(true);
+    const onPrint = () => setHidden(true);
 
     window.addEventListener("blur", onBlur);
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("keydown", onKey);
-    window.addEventListener("beforeprint", onBeforePrint);
+    window.addEventListener("beforeprint", onPrint);
     return () => {
       window.removeEventListener("blur", onBlur);
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("keydown", onKey);
-      window.removeEventListener("beforeprint", onBeforePrint);
+      window.removeEventListener("beforeprint", onPrint);
     };
-  }, [data]);
+  }, []);
 
   // Countdown auto-expire
   useEffect(() => {
@@ -59,13 +59,13 @@ export default function SetupPage() {
     return () => clearInterval(t);
   }, [data]);
 
-  // Kalau habis waktunya → reset
+  // Kalau waktu habis → reset demi keamanan
   useEffect(() => {
     if (data && ttl <= 0) {
       setData(null);
       setCode("");
-      setPrivacy(false);
-      setNotice("⏳ QR & secret key auto-disembunyikan demi keamanan. Masukkan PIN admin lagi untuk menampilkan.");
+      setHidden(false);
+      setNotice("⏳ QR & secret auto-disembunyikan demi keamanan. Masukkan PIN admin lagi untuk menampilkan.");
     }
   }, [ttl, data]);
 
@@ -82,7 +82,10 @@ export default function SetupPage() {
       const d = await res.json();
       if (!res.ok) throw new Error(d.error);
       setData(d);
-      setPrivacy(false);
+      setHidden(false);
+      setRevealedAt(
+        `${new Date().toLocaleDateString("id-ID")} ${new Date().toLocaleTimeString("id-ID")}`
+      );
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -167,13 +170,13 @@ export default function SetupPage() {
             </>
           ) : (
             <>
-              {/* Baris countdown + hide manual */}
+              {/* Baris countdown */}
               <div className="flex items-center justify-between">
                 <p className="font-mono text-[10px] uppercase tracking-wide" style={{ color: ttl <= 15 ? "#C1443A" : "#8A9590" }}>
                   ⏳ Auto-hide dalam {ttl}s
                 </p>
                 <button
-                  onClick={() => setPrivacy(true)}
+                  onClick={() => setHidden(true)}
                   className="font-mono text-[10px] uppercase tracking-wide hover:opacity-70 transition"
                   style={{ color: "#6B7570" }}
                 >
@@ -181,17 +184,17 @@ export default function SetupPage() {
                 </button>
               </div>
 
-              {/* 👇 AREA SENSITIF: QR + SECRET (blur + anti-copy) */}
+              {/* 👇 AREA SENSITIF: QR + SECRET (watermark + blur instan + anti-copy) */}
               <div className="relative" onContextMenu={(e) => e.preventDefault()}>
                 <div
-                  className="space-y-4 transition-all duration-300 select-none"
+                  className="space-y-4 select-none"
                   style={{
-                    filter: privacy ? "blur(16px)" : "none",
-                    pointerEvents: privacy ? "none" : "auto",
+                    filter: visible ? "none" : "blur(16px)",
+                    pointerEvents: visible ? "auto" : "none",
                     userSelect: "none",
                     WebkitUserSelect: "none",
                   }}
-                  aria-hidden={privacy}
+                  aria-hidden={!visible}
                 >
                   <div className="flex justify-center p-4 rounded-lg border" style={{ borderColor: "#D7DCD7" }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -206,15 +209,29 @@ export default function SetupPage() {
                   </div>
                 </div>
 
+                {/* Watermark tipis (tetap bisa discan karena QR level H) */}
+                {visible && (
+                  <div className="absolute inset-0 pointer-events-none select-none overflow-hidden rounded-lg" aria-hidden>
+                    <div
+                      className="absolute inset-0 flex flex-col justify-between py-3"
+                      style={{ opacity: 0.08, transform: "rotate(-10deg) scale(1.2)" }}
+                    >
+                      {Array.from({ length: 6 }).map((_, i) => (
+                        <p key={i} className="font-mono text-[10px] whitespace-nowrap" style={{ color: "#1B2420" }}>
+                          BRIVICE · RAHASIA · {revealedAt} · BRIVICE · RAHASIA · {revealedAt}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Overlay saat blur */}
-                {privacy && (
+                {!visible && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-lg" style={{ background: "rgba(247,248,246,0.65)" }}>
                     <p className="text-2xl">🔒</p>
-                    <p className="text-xs font-medium" style={{ color: "#6B7570" }}>
-                      Konten sensitif disembunyikan
-                    </p>
+                    <p className="text-xs font-medium" style={{ color: "#6B7570" }}>Konten sensitif disembunyikan</p>
                     <button
-                      onClick={() => { setPrivacy(false); setNotice(null); }}
+                      onClick={() => { setHidden(false); setNotice(null); }}
                       className="text-xs px-4 py-2 rounded-md text-white font-medium transition hover:opacity-85"
                       style={{ background: "#2F5D62" }}
                     >
@@ -231,7 +248,7 @@ export default function SetupPage() {
               </ol>
 
               <p className="text-[11px] rounded-md px-3 py-2" style={{ background: "#EEF1EE", color: "#6B7570" }}>
-                🛡️ QR & secret otomatis blur saat pindah aplikasi / screenshot, dan hilang setelah 2 menit. Jangan bagikan tampilan ini ke siapa pun.
+                🛡️ QR diberi watermark waktu & otomatis blur saat pindah aplikasi / screenshot. Jangan bagikan tampilan ini ke siapa pun.
               </p>
 
               {/* Udah selesai? login */}
