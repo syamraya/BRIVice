@@ -5,7 +5,7 @@ export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Route publik (tidak butuh PIN)
-  const publicPaths = ["/login", "/api/login", "/api/inngest", "/setup", "/api/totp/setup", "/api/public"];
+  const publicPaths = ["/login", "/api/login", "/api/inngest", "/setup", "/api/totp/setup", "/api/public", "/qr"];
   if (publicPaths.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
     return NextResponse.next();
   }

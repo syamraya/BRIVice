@@ -2,6 +2,8 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase-client";
 import ExportButton from "@/components/ExportButton";
+import QRPrintModal from "@/components/QRPrintModal";
+import { useSearchParams } from "next/navigation";
 
 // ---------------------------------------------------------------------------
 // Struktur Lokasi — KC Sutoyo
@@ -867,6 +869,8 @@ export default function Dashboard() {
   const [editTarget, setEditTarget] = useState<any | null>(null);
   const [photoTarget, setPhotoTarget] = useState<{ url: string; name: string } | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [qrTarget, setQrTarget] = useState<any | null>(null);
+  const searchParams = useSearchParams();
 
   const [viewMode, setViewMode] = useState<"card" | "table">(() => {
     if (typeof window === "undefined") return "card";
@@ -886,8 +890,22 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    fetchEquipment();
-  }, []);
+  fetchEquipment();
+}, []);
+
+// Auto-open ServiceModal kalau datang dari QR scan (?service=xxx)
+useEffect(() => {
+  const serviceId = searchParams.get("service");
+  if (serviceId && equipmentList.length > 0) {
+    const item = equipmentList.find((i) => i.id === serviceId);
+    if (item) {
+      setServiceTarget(item);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("service");
+      window.history.replaceState({}, "", url.pathname);
+    }
+  }
+}, [searchParams, equipmentList]);
 
   const fetchEquipment = async () => {
     setRefreshing(true);
@@ -1214,6 +1232,14 @@ export default function Dashboard() {
                               ✎
                             </button>
                             <button
+  onClick={() => setQrTarget(item)}
+  className="text-xs px-3 rounded-md border transition hover:opacity-70"
+  style={{ borderColor: "#D7DCD7", color: "#C8862A" }}
+  title="Generate QR stiker"
+>
+  QR
+</button>
+                            <button
                               onClick={() => handleDelete(item.id, item.name)}
                               disabled={deletingId === item.id}
                               className="text-xs px-2 py-1 rounded transition hover:opacity-70 disabled:opacity-40"
@@ -1312,6 +1338,14 @@ export default function Dashboard() {
                         ✎
                       </button>
                       <button
+  onClick={() => setQrTarget(item)}
+  className="text-xs px-3 rounded-md border transition hover:opacity-70"
+  style={{ borderColor: "#D7DCD7", color: "#C8862A" }}
+  title="Generate QR stiker"
+>
+  QR
+</button>
+                      <button
                         onClick={() => handleDelete(item.id, item.name)}
                         disabled={deletingId === item.id}
                         className="text-xs px-3 rounded-md transition hover:opacity-70 disabled:opacity-40"
@@ -1378,6 +1412,12 @@ export default function Dashboard() {
           onClose={() => setPhotoTarget(null)}
         />
       )}
+      {qrTarget && (
+  <QRPrintModal
+    equipment={qrTarget}
+    onClose={() => setQrTarget(null)}
+  />
+)}
     </main>
   );
 }
