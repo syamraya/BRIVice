@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase-client";
+import ExportButton from "@/components/ExportButton";
 
 // ---------------------------------------------------------------------------
 // Struktur Lokasi — KC Sutoyo
@@ -1089,6 +1090,11 @@ export default function Dashboard() {
                   ▦ Tabel
                 </button>
               </div>
+              <ExportButton
+  items={filteredList}
+  filterLocation={filterLocation}
+  counts={{ belum: belumCount, overdue: overdueCount, soon: soonCount }}
+/>
 
               <button
                 onClick={fetchEquipment}

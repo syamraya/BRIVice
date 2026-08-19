@@ -12,16 +12,19 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [shake, setShake] = useState(false);
-  const [now, setNow] = useState(new Date());
+  
+  // 👇 FIX: start with null, only set Date in useEffect
+  const [now, setNow] = useState<Date | null>(null);
   const [leftover, setLeftover] = useState(30);
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // 👇 State untuk panel LIVE dari database
+  // 👇 Live data dari database
   const [totpEnabled, setTotpEnabled] = useState(true);
   const [lines, setLines] = useState<{ color: string; text: string }[]>([]);
   const [loadingLines, setLoadingLines] = useState(true);
 
   useEffect(() => {
+    setNow(new Date()); // Set immediately on mount
     const t = setInterval(() => {
       setNow(new Date());
       setLeftover(30 - (Math.floor(Date.now() / 1000) % 30));
@@ -29,7 +32,6 @@ export default function LoginPage() {
     return () => clearInterval(t);
   }, []);
 
-  // 👇 Fetch data asli dari backend
   useEffect(() => {
     fetch("/api/public/status")
       .then((r) => r.json())
@@ -109,8 +111,13 @@ export default function LoginPage() {
     setPin("");
   };
 
-  const timeLabel = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-  const dateLabel = now.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  // 👇 Render placeholder kalau belum hydrate
+  const timeLabel = now
+    ? now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    : "--:--:--";
+  const dateLabel = now
+    ? now.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+    : "Loading...";
 
   return (
     <main
@@ -138,7 +145,7 @@ export default function LoginPage() {
         className={`w-full max-w-4xl grid grid-cols-1 md:grid-cols-5 rounded-2xl border overflow-hidden shadow-xl anim-fade-up ${shake ? "anim-shake" : ""}`}
         style={{ borderColor: "#D7DCD7" }}
       >
-        {/* -------- PANEL KIRI: BRANDING + LIVE DATA -------- */}
+        {/* PANEL KIRI */}
         <div className="md:col-span-2 p-8 flex flex-col justify-between gap-8" style={{ background: "#2F5D62", color: "#EEF1EE" }}>
           <div>
             <div className="flex items-center gap-3 mb-6">
@@ -156,7 +163,6 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* 👇 MINI LOG LIVE — asli dari database */}
           <div className="space-y-2 hidden sm:block">
             <div className="flex items-center gap-2 font-mono text-[11px]" style={{ color: "#BFD4D2" }}>
               <span
@@ -199,7 +205,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* -------- PANEL KANAN: FORM -------- */}
+        {/* PANEL KANAN */}
         <div className="md:col-span-3 bg-white p-8 md:p-10" style={{ color: "#1B2420" }}>
           <p className="font-mono text-[10px] uppercase tracking-widest mb-1" style={{ color: "#8A9590" }}>
             🔐 Two-Factor Authentication
