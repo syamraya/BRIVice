@@ -1,15 +1,78 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+
+const QR_TTL_SECONDS = 120; // QR & secret auto-hide setelah 2 menit
 
 export default function SetupPage() {
+  const router = useRouter();
   const [pin, setPin] = useState("");
   const [data, setData] = useState<{ qr: string; secret: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const [code, setCode] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+
+  // 👇 Proteksi anti-screenshot
+  const [privacy, setPrivacy] = useState(false); // blur aktif
+  const [ttl, setTtl] = useState(QR_TTL_SECONDS);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  // Blur saat window kehilangan fokus / tab disembunyikan / tombol PrintScreen / print
+  useEffect(() => {
+    const onBlur = () => {
+      if (data) setPrivacy(true);
+    };
+    const onVis = () => {
+      if (document.hidden && data) setPrivacy(true);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "PrintScreen" && data) {
+        setPrivacy(true);
+        setNotice("⌨️ Tombol screenshot terdeteksi — konten sensitif disembunyikan.");
+      }
+    };
+    const onBeforePrint = () => setPrivacy(true);
+
+    window.addEventListener("blur", onBlur);
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("beforeprint", onBeforePrint);
+    return () => {
+      window.removeEventListener("blur", onBlur);
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("beforeprint", onBeforePrint);
+    };
+  }, [data]);
+
+  // Countdown auto-expire
+  useEffect(() => {
+    if (!data) return;
+    setTtl(QR_TTL_SECONDS);
+    const started = Date.now();
+    const t = setInterval(() => {
+      setTtl(Math.max(0, QR_TTL_SECONDS - Math.floor((Date.now() - started) / 1000)));
+    }, 500);
+    return () => clearInterval(t);
+  }, [data]);
+
+  // Kalau habis waktunya → reset
+  useEffect(() => {
+    if (data && ttl <= 0) {
+      setData(null);
+      setCode("");
+      setPrivacy(false);
+      setNotice("⏳ QR & secret key auto-disembunyikan demi keamanan. Masukkan PIN admin lagi untuk menampilkan.");
+    }
+  }, [ttl, data]);
+
   const handleReveal = async () => {
     setLoading(true);
     setError(null);
+    setNotice(null);
     try {
       const res = await fetch("/api/totp/setup", {
         method: "POST",
@@ -19,10 +82,36 @@ export default function SetupPage() {
       const d = await res.json();
       if (!res.ok) throw new Error(d.error);
       setData(d);
+      setPrivacy(false);
     } catch (e: any) {
       setError(e.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleVerifyLogin = async () => {
+    if (code.length !== 6 || verifying) return;
+    setVerifying(true);
+    setVerifyError(null);
+
+    try {
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ totp: code }),
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.error || "Kode salah");
+      }
+      router.push("/");
+      router.refresh();
+    } catch (e: any) {
+      setVerifyError(e.message);
+      setCode("");
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -44,6 +133,12 @@ export default function SetupPage() {
         </div>
 
         <div className="p-6 space-y-4">
+          {notice && (
+            <p className="text-xs rounded-md px-3 py-2" style={{ background: "#FBEED9", color: "#8E7043" }}>
+              {notice}
+            </p>
+          )}
+
           {!data ? (
             <>
               <div>
@@ -72,25 +167,128 @@ export default function SetupPage() {
             </>
           ) : (
             <>
-              <div className="flex justify-center p-4 rounded-lg border" style={{ borderColor: "#D7DCD7" }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={data.qr} alt="QR Google Authenticator" className="w-56 h-56" />
-              </div>
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide mb-1" style={{ color: "#6B7570" }}>Secret Key</p>
-                <p className="font-mono text-xs p-2 rounded border break-all" style={{ borderColor: "#D7DCD7", background: "#F7F8F6" }}>
-                  {data.secret}
+              {/* Baris countdown + hide manual */}
+              <div className="flex items-center justify-between">
+                <p className="font-mono text-[10px] uppercase tracking-wide" style={{ color: ttl <= 15 ? "#C1443A" : "#8A9590" }}>
+                  ⏳ Auto-hide dalam {ttl}s
                 </p>
+                <button
+                  onClick={() => setPrivacy(true)}
+                  className="font-mono text-[10px] uppercase tracking-wide hover:opacity-70 transition"
+                  style={{ color: "#6B7570" }}
+                >
+                  🙈 Sembunyikan
+                </button>
               </div>
+
+              {/* 👇 AREA SENSITIF: QR + SECRET (blur + anti-copy) */}
+              <div className="relative" onContextMenu={(e) => e.preventDefault()}>
+                <div
+                  className="space-y-4 transition-all duration-300 select-none"
+                  style={{
+                    filter: privacy ? "blur(16px)" : "none",
+                    pointerEvents: privacy ? "none" : "auto",
+                    userSelect: "none",
+                    WebkitUserSelect: "none",
+                  }}
+                  aria-hidden={privacy}
+                >
+                  <div className="flex justify-center p-4 rounded-lg border" style={{ borderColor: "#D7DCD7" }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={data.qr} alt="QR Google Authenticator" className="w-56 h-56" draggable={false} />
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide mb-1" style={{ color: "#6B7570" }}>Secret Key</p>
+                    <p className="font-mono text-xs p-2 rounded border break-all" style={{ borderColor: "#D7DCD7", background: "#F7F8F6" }}>
+                      {data.secret}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Overlay saat blur */}
+                {privacy && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-lg" style={{ background: "rgba(247,248,246,0.65)" }}>
+                    <p className="text-2xl">🔒</p>
+                    <p className="text-xs font-medium" style={{ color: "#6B7570" }}>
+                      Konten sensitif disembunyikan
+                    </p>
+                    <button
+                      onClick={() => { setPrivacy(false); setNotice(null); }}
+                      className="text-xs px-4 py-2 rounded-md text-white font-medium transition hover:opacity-85"
+                      style={{ background: "#2F5D62" }}
+                    >
+                      👁 Tampilkan Lagi
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <ol className="text-xs space-y-1 list-decimal list-inside" style={{ color: "#6B7570" }}>
-                <li>Buka aplikasi <strong>Google Authenticator</strong> di HP</li>
+                <li>Buka <strong>Google Authenticator</strong> di HP</li>
                 <li>Tekan <strong>+</strong> → <strong>Scan QR code</strong></li>
-                <li>Entri <strong>BRIVice (KC Sutoyo Admin)</strong> akan muncul</li>
-                <li>Masuk ke dashboard pakai kode 6 digit yang berputar</li>
+                <li>Entri <strong>BRIVice (KC Sutoyo Admin)</strong> muncul</li>
               </ol>
-              <p className="text-[11px] rounded-md px-3 py-2" style={{ background: "#FBEED9", color: "#8E7043" }}>
-                ⚠️ Simpan secret key di tempat aman. Siapa pun yang punya secret ini bisa membuat kode login.
+
+              <p className="text-[11px] rounded-md px-3 py-2" style={{ background: "#EEF1EE", color: "#6B7570" }}>
+                🛡️ QR & secret otomatis blur saat pindah aplikasi / screenshot, dan hilang setelah 2 menit. Jangan bagikan tampilan ini ke siapa pun.
               </p>
+
+              {/* Udah selesai? login */}
+              <div className="pt-2 border-t" style={{ borderColor: "#EEF1EE" }}>
+                <p className="font-mono text-[10px] uppercase tracking-widest mb-2" style={{ color: "#8A9590" }}>
+                  ✅ Udah selesai scan?
+                </p>
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    placeholder="6 digit kode"
+                    className="flex-1 p-2.5 rounded-md border text-center font-mono text-lg tracking-[0.3em] outline-none transition"
+                    style={{ borderColor: verifyError ? "#C1443A" : "#D7DCD7", color: "#1B2420" }}
+                    value={code}
+                    onChange={(e) => {
+                      setCode(e.target.value.replace(/\D/g, "").slice(0, 6));
+                      setVerifyError(null);
+                    }}
+                    onKeyDown={(e) => e.key === "Enter" && handleVerifyLogin()}
+                    disabled={verifying}
+                  />
+                  <button
+                    onClick={handleVerifyLogin}
+                    disabled={verifying || code.length !== 6}
+                    className="px-4 text-white text-sm font-medium rounded-md transition disabled:opacity-40 hover:opacity-90"
+                    style={{ background: "#3F7A5E" }}
+                  >
+                    {verifying ? "…" : "🔓 Verifikasi & Masuk"}
+                  </button>
+                </div>
+
+                {verifyError && (
+                  <p className="text-xs rounded-md px-3 py-2 mt-2" style={{ background: "#F7E7E5", color: "#C1443A" }}>
+                    ⚠️ {verifyError}
+                  </p>
+                )}
+
+                <div className="flex items-center justify-between mt-3">
+                  <button
+                    onClick={() => router.push("/login")}
+                    className="text-xs font-medium underline underline-offset-2 hover:opacity-70 transition"
+                    style={{ color: "#2F5D62" }}
+                  >
+                    Ke halaman login →
+                  </button>
+                  <button
+                    onClick={() => { setData(null); setPin(""); setCode(""); setVerifyError(null); setNotice(null); }}
+                    className="text-xs hover:opacity-70 transition"
+                    style={{ color: "#8A9590" }}
+                  >
+                    ↺ Ulangi setup
+                  </button>
+                </div>
+              </div>
             </>
           )}
         </div>
