@@ -2,18 +2,19 @@ import { NextResponse } from "next/server";
 import { inngest } from "@/lib/inngest";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
-// POST /api/equipment/[id]/service
-// Body: { servicedAt: string (YYYY-MM-DD), photoUrl?: string | null }
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   const { id } = await params;
   const body = await req.json();
-  const { servicedAt, photoUrl } = body;
+  const { servicedAt, photoUrl, notes } = body; // 👈 tambah notes
 
   if (!servicedAt) {
     return NextResponse.json({ error: "servicedAt wajib diisi" }, { status: 400 });
   }
 
-  // 1. Ambil data equipment (butuh interval-nya untuk hitung reminder berikutnya)
+  // 1. Ambil data equipment
   const { data: equipment, error: eqFetchError } = await supabaseAdmin
     .from("equipment")
     .select("id, service_interval_days")
@@ -24,7 +25,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Peralatan tidak ditemukan" }, { status: 404 });
   }
 
-  // 2. Update equipment: tanggal service terakhir + foto terbaru
+  // 2. Update equipment
   const { error: updateError } = await supabaseAdmin
     .from("equipment")
     .update({
@@ -38,25 +39,26 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: updateError.message }, { status: 400 });
   }
 
-  // 3. Catat ke riwayat service
-  const { error: logError } = await supabaseAdmin.from("service_logs").insert({
+  // 3. Catat ke riwayat service (tabel service_history, bukan service_logs)
+  const { error: logError } = await supabaseAdmin.from("service_history").insert({
     equipment_id: id,
-    serviced_at: servicedAt,
+    service_date: servicedAt,
     photo_url: photoUrl || null,
+    notes: notes || null, // 👈 simpan catatan
   });
 
   if (logError) {
     return NextResponse.json({ error: logError.message }, { status: 400 });
   }
 
-  // 4. Batalkan reminder lama yang masih pending (biar tidak ada 2 reminder aktif)
+  // 4. Batalkan reminder lama yang pending
   await supabaseAdmin
     .from("reminders")
     .update({ status: "cancelled" })
     .eq("equipment_id", id)
     .eq("status", "pending");
 
-  // 5. Hitung & jadwalkan reminder berikutnya
+  // 5. Jadwalkan reminder berikutnya
   const nextDate = new Date(servicedAt);
   nextDate.setDate(nextDate.getDate() + equipment.service_interval_days);
 
@@ -83,5 +85,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     },
   });
 
-  return NextResponse.json({ nextServiceDate: nextDate.toISOString() });
+  return NextResponse.json({ 
+    success: true,
+    nextServiceDate: nextDate.toISOString() 
+  });
 }
